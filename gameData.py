@@ -94,4 +94,28 @@ team_epa = off_epa.merge(def_epa, on=['team','season','week'])
 team_epa = team_epa[team_epa['season'] != years[-1]]
 team_epa = team_epa.reset_index(drop=True)
 
-team_epa.to_csv("team_epa.txt", sep="\t", index=False)
+# collect all score and home/away team related data to store alongside EPA/EWMA
+# for training purpose
+scores = all_stats[['season','week','home_team','away_team','home_score',\
+    'away_score']]
+# remove duplicate entries from both team perspectives and reset indecies
+scores = scores.drop_duplicates().reset_index(drop=True)
+# create a new 'win' column which records a 1 if the home team wins and 0 if not
+scores = scores.assign(win=lambda n: (n.home_score > n.away_score).astype(int))
+
+# create DataFrame which collects EPA/EWMA and stores alongside game scores
+# from the home team's perspective
+home_scores = scores.merge(team_epa.rename(columns={'team':'home_team'}),\
+    on=['home_team','season','week'])
+# create DataFrame which collects EPA/EWMA and stores alongside game scores
+# from the away team's perspective
+away_scores = scores.merge(team_epa.rename(columns={'team':'away_team'}),\
+    on=['away_team','season','week'])
+
+# merge two previous DataFrames to store only one instance of every game with
+# outcome alongside corresponding home and away team's EPA/EWMA data. this is
+# the final target DataFrame in which to train the model on
+game_data = home_scores.merge(away_scores, on=['season','week','home_team',\
+    'away_team','home_score','away_score','win'], suffixes=('_home','_away'))
+
+game_data.to_csv("game_data.txt", sep="\t", index=False)
